@@ -9,7 +9,7 @@ import socket
 import queue
 
 
-class ProtoServer(object):
+class Server(object):
     """Defines a client interface meant to interact with Proto Clients.
     This class contains code for connecting to and interacting with the client
     interfaces.
@@ -29,11 +29,11 @@ class ProtoServer(object):
 
         # Create a socket and start listening process
         self.__address = (ip, port)
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__sock.bind(self.__address)
-        self.__sock.setblocking(0)
-        self.__sock.listen(5)
+        self.__server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.__server_sock.bind(self.__address)
+        self.__server_sock.setblocking(0)
+        self.__server_sock.listen(5)
 
         # Create an empty map of each client's address to its connection
         self.__clients = {}
@@ -52,7 +52,7 @@ class ProtoServer(object):
         Closes the server socket.
         """
 
-        self.__sock.close()
+        self.__server_sock.close()
         logging.info("server connection closed on " + str(self.__address))
 
     @property
@@ -87,7 +87,7 @@ class ProtoServer(object):
         # Socket Connections which can be read from and be written to.
         # The socket of this server is included in the readable because a
         # readable server socket can accept connections.
-        readable = [self.__sock]
+        readable = [self.__server_sock]
         writeable = []
 
         # Start the server, keep it running until some external thread modifies
@@ -105,7 +105,7 @@ class ProtoServer(object):
             for sock in sel_r:
                 # If the readable socket is the socket of this server, then the
                 # server has a new connection which it can accept.
-                if sock == self.__sock:
+                if sock == self.__server_sock:
                     addr, conn = self.__socket_connect(sock)
 
                     readable.append(conn)
@@ -302,8 +302,8 @@ class ProtoServer(object):
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.INFO)
 
-    proto_server = ProtoServer("127.0.0.1", 8080)
+    server = Server("127.0.0.1", 8080)
     try:
-        proto_server.main_loop()
+        server.main_loop()
     finally:
-        del proto_server
+        del server
