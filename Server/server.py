@@ -127,3 +127,8 @@ class Server(object):
             server.close()
             loop.run_until_complete(server.wait_closed())
             loop.close()
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    server = Server()
+    server.start_server()
