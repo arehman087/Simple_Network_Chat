@@ -49,6 +49,19 @@ class Server(object):
         """
         writer.close()
 
+    def get_client(self, message):
+        """
+        gets the client from the message sent and sends the message to the
+        client
+        """
+        x = message.find('whisper: ')
+        if x == -1:
+            logging.debug('invalid format')
+        y = message.find(':', 9)
+        client_name = message[9:y]
+        client_message = message[y+2:]
+        self.__clients[client_name].writer.write(bytes(client_message))
+
     async def converse(self, person):
         """
         does the conversation for the client
@@ -58,11 +71,20 @@ class Server(object):
             client_shake = await person.reader.readexactly(1)
 
             if client_shake[0] == MessageType.MESSAGE.value:
-                logging.debug("client has recieved type message")
+                logging.debug("server has received type message")
                 # make sure to get all messages.
                 message = await person.reader.read(4096)
                 for p in self.__clients:
                     self.__clients[p].writer.write(bytes([MessageType.MESSAGE.value, message]))
+
+            elif client_shake[0] == MessageType.WHISPER.value:
+                logging.debug("server has received type whisper")
+                message = await person.reader.read(4096)
+                decoded_message = bytes.decode(message)
+                self.get_client(decoded_message)
+
+            elif client_shake[0] == MessageType.SHOUT.value:
+                pass
 
     async def __client_handler(self, reader, writer):
         """
