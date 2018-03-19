@@ -50,18 +50,28 @@ class Server(object):
         """
         writer.close()
 
-    def get_client(self, message):
+    def get_client(self, encoded_message):
         """
         gets the client from the message sent and sends the message to the
         client
         """
-        x = message.find('whisper: ')
-        if x == -1:
+        # need to send name
+        message = pickle.loads(encoded_message)
+        format_len = len('whisper: client: ')
+
+        x = message.find('message : ')
+
+        client_name = message[format_len:x]
+        logging.debug('%s was received from message', client_name)
+        if len(client_name) == 0:
             logging.debug('invalid format')
-        y = message.find(':', 9)
-        client_name = message[9:y]
-        client_message = message[y+2:]
-        self.__clients[client_name].writer.write(bytes(client_message))
+            return 0
+        client_message = message[x+len('message: '):]
+        try:
+            self.__clients[client_name].writer.write(pickle.dumps(client_message))
+        except KeyError:
+            return 0
+        return 1
 
     async def converse(self, person):
         """
@@ -76,15 +86,17 @@ class Server(object):
                 # make sure to get all messages.
                 message = await person.reader.read(4096)
                 for p in self.__clients:
-                    self.__clients[p].writer.write(bytes([MessageType.MESSAGE.value, message]))
+                    # may need to add message types in client
+                    self.__clients[p].writer.write(message)
 
             elif client_shake[0] == MessageType.WHISPER.value:
                 logging.debug("server has received type whisper")
                 message = await person.reader.read(4096)
-                decoded_message = bytes.decode(message)
-                self.get_client(decoded_message)
+                val = self.get_client(message)
+                if val == 0:
+                    person.writer.write(pickle.dumps('error sending message'))
 
-            elif client_shake[0] == MessageType.SHOUT.value:
+            elif client_shake == MessageType.SHOUT.value:
                 pass
 
     async def __client_handler(self, reader, writer):
@@ -102,11 +114,10 @@ class Server(object):
                 self.kill_client(writer)
                 return
             client_name = pickle.loads(await reader.read(4096))
-            logging.debug(client_name)
             # check if client name already used
             if client_name in self.__clients.keys():
                 logging.debug("asking for a different name")
-                writer.write(bytes([MessageType.RESEND_NAME.value]))
+                writer.write(pickle.dumps(MessageType.RESEND_NAME.value))
             else:
                 logging.debug("%s has connected", client_name)
                 new_client = Person(name=client_name, reader=reader, writer=writer)

@@ -27,14 +27,35 @@ class Client(object):
         self.__loop = loop
 
     def send_name(self):
-        ######NEED TO FIX
         x = input('What is your name?')
-        self.__writer.write(bytes([0, 0]))
-
+        self.__writer.write(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
         self.__writer.write(pickle.dumps(x))
 
-    def converse(self):
-        pass
+    def send_to_server(self, message, mess_type):
+        # send handshake
+        self.__writer.write(bytes([mess_type, mess_type]))
+        self.__writer.write(pickle.dumps(message))
+        return
+
+    async def receive_from_server(self):
+        message = pickle.loads(await self.__reader.read(4096))
+        print(message)
+        return
+
+    async def converse(self):
+        while True:
+            x = input('message: ')
+            chk = x.find('whisper: ', 0, len('whisper: ')+2)
+            chk2 = x.find('client: ', len('whisper: '))
+            chk3 = x.find('message: ',len('whisper: ')+len('client: '))
+            logging.debug("chk1 = %d, chk2 = %d, chk3 = %d", chk, chk2, chk3)
+
+            if chk == -1 and chk2 == -1 and chk3 == -1:
+                self.send_to_server(x, MessageType.MESSAGE.value)
+            else:
+                self.send_to_server(x, MessageType.WHISPER.value)
+
+            await self.receive_from_server()
 
 
 async def cl_functions(loop):
@@ -52,6 +73,7 @@ async def cl_functions(loop):
 
     client = Client(reader, writer, loop)
     client.send_name()
+    await client.converse()
 
 
 def main():
