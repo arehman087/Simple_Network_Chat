@@ -2,6 +2,7 @@ import asyncio
 from collections import namedtuple
 import enum
 import logging
+import pickle
 import sys
 
 Person = namedtuple("Person", "name, reader, writer")
@@ -68,7 +69,7 @@ class Server(object):
         :param person: named tuple that holds the name, reader, and writer
         """
         while True:
-            client_shake = await person.reader.readexactly(1)
+            client_shake = await person.reader.readexactly(2)
 
             if client_shake[0] == MessageType.MESSAGE.value:
                 logging.debug("server has received type message")
@@ -94,12 +95,14 @@ class Server(object):
         """
         logging.debug("add client to the dictionary")
         while True:
-            client_shake = await reader.readexactly(1)
+            client_shake = await reader.readexactly(2)
             logging.debug("client sent %s", client_shake)
             if client_shake[0] != MessageType.ON_CONNECT.value:
                 logging.debug("Client sent something wrong, killing client")
                 self.kill_client(writer)
-            client_name = reader.read(4096)
+                return
+            client_name = pickle.loads(await reader.read(4096))
+            logging.debug(client_name)
             # check if client name already used
             if client_name in self.__clients.keys():
                 logging.debug("asking for a different name")
@@ -115,18 +118,19 @@ class Server(object):
 
         loop = asyncio.get_event_loop()
         server_loop = asyncio.start_server(self.__client_handler, host=self.__host, port=self.__port)
-        server = loop.run_until_complete(server_loop)
+        server_side = loop.run_until_complete(server_loop)
 
-        logging.debug("Serving on %s", (server.sockets[0].getsockname()))
+        logging.debug("Serving on %s", (server_side.sockets[0].getsockname()))
 
         try:
             loop.run_forever()
         except KeyboardInterrupt:
             pass
         finally:
-            server.close()
-            loop.run_until_complete(server.wait_closed())
+            server_side.close()
+            loop.run_until_complete(server_side.wait_closed())
             loop.close()
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
