@@ -18,6 +18,7 @@ class MessageType(enum.Enum):
     WHISPER = 3
     SHOUT = 4
     RESEND_NAME = 5
+    OKAY_NAME = 6
 
 
 class Server(object):
@@ -84,7 +85,9 @@ class Server(object):
             if client_shake[0] == MessageType.MESSAGE.value:
                 logging.debug("server has received type message")
                 # make sure to get all messages.
-                message = await person.reader.read(4096)
+                message = pickle.loads(await person.reader.read(4096))
+                message = person.name + ': ' + message
+                message = pickle.dumps(message)
                 for p in self.__clients:
                     # may need to add message types in client
                     self.__clients[p].writer.write(message)
@@ -117,8 +120,9 @@ class Server(object):
             # check if client name already used
             if client_name in self.__clients.keys():
                 logging.debug("asking for a different name")
-                writer.write(pickle.dumps(MessageType.RESEND_NAME.value))
+                writer.write(bytes([MessageType.RESEND_NAME.value, MessageType.RESEND_NAME.value]))
             else:
+                writer.write(bytes([MessageType.OKAY_NAME.value, MessageType.OKAY_NAME.value]))
                 logging.debug("%s has connected", client_name)
                 new_client = Person(name=client_name, reader=reader, writer=writer)
                 self.__clients[client_name] = new_client

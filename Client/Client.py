@@ -2,6 +2,7 @@ import asyncio
 import enum
 import logging
 import pickle
+import threading
 
 
 class MessageType(enum.Enum):
@@ -14,6 +15,7 @@ class MessageType(enum.Enum):
     WHISPER = 3
     SHOUT = 4
     RESEND_NAME = 5
+    OKAY_NAME = 6
 
 
 class Client(object):
@@ -26,10 +28,14 @@ class Client(object):
         self.__writer = writer
         self.__loop = loop
 
-    def send_name(self):
-        x = input('What is your name?')
-        self.__writer.write(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
-        self.__writer.write(pickle.dumps(x))
+    async def send_name(self):
+        while True:
+            x = input('What is your name?')
+            self.__writer.write(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
+            self.__writer.write(pickle.dumps(x))
+            chk = await self.__reader.readexactly(2)
+            if chk[0] == MessageType.OKAY_NAME.value:
+                return
 
     def send_to_server(self, message, mess_type):
         # send handshake
@@ -40,22 +46,24 @@ class Client(object):
     async def receive_from_server(self):
         message = pickle.loads(await self.__reader.read(4096))
         print(message)
-        return
 
     async def converse(self):
         while True:
-            x = input('message: ')
-            chk = x.find('whisper: ', 0, len('whisper: ')+2)
-            chk2 = x.find('client: ', len('whisper: '))
-            chk3 = x.find('message: ',len('whisper: ')+len('client: '))
-            logging.debug("chk1 = %d, chk2 = %d, chk3 = %d", chk, chk2, chk3)
+            try:
+                await self.receive_from_server()
+            except KeyboardInterrupt:
+                x = input('message: ')
+                chk = x.find('whisper: ', 0, len('whisper: ')+2)
+                chk2 = x.find('client: ', len('whisper: '))
+                chk3 = x.find('message: ',len('whisper: ')+len('client: '))
+                logging.debug("chk1 = %d, chk2 = %d, chk3 = %d", chk, chk2, chk3)
 
-            if chk == -1 and chk2 == -1 and chk3 == -1:
-                self.send_to_server(x, MessageType.MESSAGE.value)
-            else:
-                self.send_to_server(x, MessageType.WHISPER.value)
+                if chk == -1 and chk2 == -1 and chk3 == -1:
+                    self.send_to_server(x, MessageType.MESSAGE.value)
+                else:
+                    self.send_to_server(x, MessageType.WHISPER.value)
 
-            await self.receive_from_server()
+
 
 
 async def cl_functions(loop):
@@ -72,14 +80,26 @@ async def cl_functions(loop):
         return
 
     client = Client(reader, writer, loop)
-    client.send_name()
+    await client.send_name()
     await client.converse()
 
 
-def main():
+def main1():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(cl_functions(loop))
 
+
+def main():
+    import socket as s
+    sock = s.socket(s.AF_INET, s.SOCK_STREAM)
+
+    sock.connect(('localHost', 4444))
+    x = input('What is your name?')
+    sock.sendall(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
+    sock.sendall(pickle.dumps(x))
+    chk = sock.recv(2)
+    if chk[0] == MessageType.OKAY_NAME.value:
+        print("Hello")
 
 if __name__ == '__main__':
     main()
