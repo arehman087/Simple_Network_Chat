@@ -23,9 +23,8 @@ class Client(object):
     creates a client that will recieve messages
     """
 
-    def __init__(self, name, host, port):
+    def __init__(self, host, port):
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.__name = name
         self.__host = host
         self.__port = port
 
@@ -40,12 +39,15 @@ class Client(object):
         except socket.error as msg:
             logging.debug("Connection error: %s", msg)
 
-    def send_name(self):
+    def send_name(self, name):
         """
         send name to server on initial connection
+        :return 1 if the name is longer than 2 characters and unique else return 0
         """
+        if len(name) < 2:
+            return
         self.__sock.sendall(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
-        self.__sock.sendall(pickle.dumps(self.__name))
+        self.__sock.sendall(pickle.dumps(name))
         chk = self.__sock.recv(2)
         if chk[0] == MessageType.OKAY_NAME.value:
             return 1
@@ -68,20 +70,4 @@ class Client(object):
         :return: string of what was received
         """
         message = pickle.loads(self.__sock.recv(4096))
-        return message
-#delete later
-def main():
-    name = input('Name? ')
-    host = input("Host? ")
-    port = input("Port? ")
-    port = int(port)
-
-    client = Client(name, host, port)
-    client.make_connection()
-    print(client.send_name())
-    client.send_to_server("hello", MessageType.MESSAGE.value)
-    print(client.receive_from_server())
-    return
-
-if __name__ == '__main__':
-    main()
+        return str(message)
