@@ -14,21 +14,21 @@ class ClientGui(tk.Tk):
         """
         initializes the gui
         """
-        tk.Tk.__init__(self, *args, **kwargs)
+
         # make the connection
         self.client = Client.Client('localHost', 4444)
         self.client.make_connection()
 
-        # set weights accordingly for each row and column
-        self.resizable(width=False, height=False)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        while True: # TODO: fix the dialog box
+        while True: 
             dialog = Dialog('Enter Name')
             if self.client.send_name(dialog.message) is 1:
                 break
 
+        tk.Tk.__init__(self, *args, **kwargs)
+        # set weights accordingly for each row and column
+        self.resizable(width=False, height=False)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
         # make the title label
         label = tk.Label(self, text='Network Chat', font=LARGE_FONT)
@@ -38,14 +38,16 @@ class ClientGui(tk.Tk):
         self.receiver_box = tk.Text(self)
         self.receiver_box.config(state='disabled')
         self.receiver_box.grid(column=0, row=1, columnspan=3,  sticky='EW')
-
+        import threading
+        threading.Thread(target=self.r_box).start()
         # make the sending box
-        self.send_box = tk.Text(self, height=1)
+        self.send_box = tk.Entry(self)
         self.send_box.grid(column=0, row=2, sticky='EW')
 
         # make the button for sending
-        button1 = tk.Button(self, text="Send", command=self.s_button())
+        button1 = tk.Button(self, text="Send", command=self.s_button)
         button1.grid(column=1, row=2, sticky="EW")
+
         self.tkraise()
 
     def r_box(self):
@@ -53,20 +55,25 @@ class ClientGui(tk.Tk):
         receives messages from other clients
         """
         while True:
-            self.receiver_box.insert(tk.END, self.client.receive_from_server())
+            message = self.client.receive_from_server()
+            self.receiver_box.config(state='normal')
+            self.receiver_box.insert(tk.END, message)
+            self.receiver_box.config(state='disabled')
 
     def s_box(self):
         """
         gets the message that will be sent to the other clients
         """
-        message = self.send_box.get('1.0', tk.END)
-        return str(message)
+        message = self.send_box.get()
+        self.send_box.delete(0, tk.END)
+        return str(message + '\n')
 
     def s_button(self):
         """
         sends message to the other clients
         """
-        self.client.send_to_server(self.s_box(), 2)
+        self.client.send_to_server(self.s_box(),
+                                   Client.MessageType.MESSAGE.value)
 
 
 class Dialog(tk.Tk):
@@ -83,17 +90,16 @@ class Dialog(tk.Tk):
 
         self.e.focus_set()
         self.message = ''
-        self.button = tk.Button(text='OK', width=10, command=self.dialog_get())
+        self.button = tk.Button(text='OK', width=10, command=self.dialog_get)
         self.button.pack()
         self.mainloop()
 
     def dialog_get(self):
         """
         Gets the message from the dialog box
-        :return: string: message in the dialog box
         """
         self.message = self.e.get()
-        return str(self.message)
+        self.destroy()
 
 
 def main():
