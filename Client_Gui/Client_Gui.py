@@ -19,7 +19,7 @@ class ClientGui(tk.Tk):
         self.client = Client.Client('localHost', 4444)
         self.client.make_connection()
 
-        while True: 
+        while True:
             dialog = Dialog('Enter Name')
             if self.client.send_name(dialog.message) is 1:
                 break
