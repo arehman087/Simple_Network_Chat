@@ -1,6 +1,7 @@
 import tkinter as tk
 import Client
 from Client import Client
+import socket
 
 LARGE_FONT = ('Verdana', 12)
 
@@ -16,8 +17,14 @@ class ClientGui(tk.Tk):
         """
 
         # make the connection
-        self.client = Client.Client('localHost', 4444)
-        self.client.make_connection()
+        while True:
+            dialog = Dialog('Enter Host')
+            try:
+                self.client = Client.Client(dialog.message, 4444)
+                self.client.make_connection()
+                break
+            except socket.error:
+                continue
 
         while True:
             dialog = Dialog('Enter Name')
@@ -78,13 +85,16 @@ class ClientGui(tk.Tk):
 
 class Dialog(tk.Tk):
 
-    def __init__(self, message):
+    def __init__(self, label):
         """
         initializes the dialog box to take in user input to send initial data
         to server
         :param message: message that needs to be displayed
         """
-        tk.Tk.__init__(self, message)
+        tk.Tk.__init__(self, label)
+        label_message = tk.Label(self, text=label)
+        label_message.pack()
+
         self.e = tk.Entry()
         self.e.pack()
 

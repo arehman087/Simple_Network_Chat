@@ -3,7 +3,7 @@ from collections import namedtuple
 import enum
 import logging
 import pickle
-import sys
+import socket
 
 Person = namedtuple("Person", "name, reader, writer")
 
@@ -26,14 +26,14 @@ class Server(object):
     Server that will handle clients and reroute messages
     """
 
-    def __init__(self):
+    def __init__(self, host, port):
         """
         initializes the server with a dictionary of clients
         """
         # will use namedtuples to keep track of clients
         self.__clients = {}
-        self.__host = 'localHost'
-        self.__port = 4444
+        self.__host = host
+        self.__port = port
         self.__limit = 10
 
     def kill_and_remove_client(self, person):
@@ -149,5 +149,9 @@ class Server(object):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    server = Server()
+    x = socket.gethostbyname(socket.gethostname())
+    print("Host: %s", x)
+    print("Port: 4444")
+
+    server = Server(x, 4444)
     server.start_server()

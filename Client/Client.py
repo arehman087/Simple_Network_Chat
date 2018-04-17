@@ -34,10 +34,8 @@ class Client(object):
         :param host: IP address of the server it is connecting to
         :param port: port of the host
         """
-        try:
-            self.__sock.connect((self.__host, self.__port))
-        except socket.error as msg:
-            logging.debug("Connection error: %s", msg)
+
+        self.__sock.connect((self.__host, self.__port))
 
     def send_name(self, name):
         """
