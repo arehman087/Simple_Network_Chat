@@ -1,8 +1,11 @@
+from collections import namedtuple
 import socket
 import enum
 import logging
 import pickle
 import MessagePacket
+
+Package = namedtuple("Package", "Message, Type, Name")
 
 
 class MessageType(enum.Enum):
@@ -58,7 +61,7 @@ class Client(object):
         :param mess_type: type of message; whisper, shout, regular message
         :param client_name: name of the client if the message is a whisper
         """
-        self.__sock.sendall(pickle.dumps(MessagePacket.MessagePacket(message,mess_type, client_name)))
+        self.__sock.sendall(pickle.dumps(MessagePacket.MessagePacket(message, mess_type, client_name)))
         return
 
     def receive_from_server(self):
@@ -67,20 +70,21 @@ class Client(object):
         :return: string of what was received
         """
         message = pickle.loads(self.__sock.recv(4096))
-        if message.get_message_type() == MessageType.REFRESH_CLIENTS.value:
-            self.refresh_clients(message)
+        message_pack = Package(message.get_message(), message.get_message_type(), message.get_client_name())
+        if message_pack.Type == MessageType.REFRESH_CLIENTS.value:
+            self.refresh_clients(message.get_message())
             print(self.__clients)
-            if message.get_client_name() is None:
-                return ''
-            return str(message.get_client_name()) + " has connected\n"
-        return str(message.get_message())
+            if message_pack.Name is None:
+                return Package("a user has connected\n", message_pack.Type, None)
+            return message_pack
+        return message_pack
 
     def refresh_clients(self, message_pack):
         """
         update the client dictionary
         :param message_pack: packet that holds the dictionary
         """
-        self.__clients = message_pack.get_message()
+        self.__clients = message_pack
 
     def get_clients(self):
         return self.__clients

@@ -1,9 +1,13 @@
-import tkinter as tk
 import Client
 from Client import Client
+from collections import namedtuple
 import socket
+import threading
+import time
+import tkinter as tk
 
 LARGE_FONT = ('Verdana', 12)
+Package = namedtuple("Package", "Message, Type, Name")
 
 
 class ClientGui(tk.Tk):
@@ -44,18 +48,29 @@ class ClientGui(tk.Tk):
         # make the receiving box
         self.receiver_box = tk.Text(self)
         self.receiver_box.config(state='disabled')
-        self.receiver_box.grid(column=0, row=1, columnspan=3,  sticky='EW')
-        import threading
+        self.receiver_box.grid(column=0, row=1, columnspan=2,  sticky='EW')
+
         threading.Thread(target=self.r_box).start()
         # make the sending box
         self.send_box = tk.Entry(self)
-        self.send_box.grid(column=0, row=2, sticky='EW')
+        self.send_box.grid(column=0, row=2, columnspan=2, sticky='EW')
 
         # make the button for sending
         button1 = tk.Button(self, text="Send", command=self.s_button)
-        button1.grid(column=1, row=2, sticky="EW")
+        button1.grid(column=2, row=2, sticky="EW")
+
+        self.list_box = tk.Listbox(self)
+        self.list_box.grid(column=2, row=1, sticky='NSEW')
+
+        update_button = tk.Button(self, text="Update", command=self.update_clients)
+        update_button.grid(column=2, row=0, sticky='EW')
 
         self.tkraise()
+
+    def update_clients(self):
+        self.list_box.delete(0, tk.END)
+        for x in self.client.get_clients():
+            self.list_box.insert(tk.END, x)
 
     def r_box(self):
         """
@@ -64,7 +79,7 @@ class ClientGui(tk.Tk):
         while True:
             message = self.client.receive_from_server()
             self.receiver_box.config(state='normal')
-            self.receiver_box.insert(tk.END, message)
+            self.receiver_box.insert(tk.END, message.Message)
             self.receiver_box.config(state='disabled')
 
     def s_box(self):
