@@ -4,6 +4,7 @@ import enum
 import logging
 import pickle
 import socket
+import MessagePacket
 
 Person = namedtuple("Person", "name, reader, writer")
 
@@ -30,7 +31,7 @@ class Server(object):
         """
         initializes the server with a dictionary of clients
         """
-        # will use namedtuples to keep track of clients
+        # will use dictionary to keep track of clients
         self.__clients = {}
         self.__host = host
         self.__port = port
@@ -51,25 +52,21 @@ class Server(object):
         """
         writer.close()
 
-    def get_client(self, encoded_message):
+    def get_client(self, message_pack):
         """
         gets the client from the message sent and sends the message to the
         client
         """
-        # need to send name
-        message = pickle.loads(encoded_message)
-        format_len = len('whisper: client: ')
-
-        x = message.find('message : ')
-
-        client_name = message[format_len:x]
-        logging.debug('%s was received from message', client_name)
-        if len(client_name) == 0:
-            logging.debug('invalid format')
+        logging.debug('%s was received from message', message_pack.get_client_name())
+        if message_pack.get_client_name is None:
+            logging.debug('invalid format!')
             return 0
-        client_message = message[x+len('message: '):]
+
         try:
-            self.__clients[client_name].writer.write(pickle.dumps(client_message))
+            self.__clients[message_pack.get_client_name()].writer.write(pickle.dumps
+                                                                        (MessagePacket.MessagePacket
+                                                                         (message_pack.get_message(),
+                                                                          MessageType.MESSAGE.value, None)))
         except KeyError:
             return 0
         return 1
@@ -80,21 +77,24 @@ class Server(object):
         :param person: named tuple that holds the name, reader, and writer
         """
         while True:
-            client_shake = await person.reader.readexactly(2)
+            client_shake = pickle.loads(await person.reader.read(4096))
 
-            if client_shake[0] == MessageType.MESSAGE.value:
+            if client_shake.get_message_type() == MessageType.MESSAGE.value:
                 logging.debug("server has received type message")
                 # make sure to get all messages.
-                message = pickle.loads(await person.reader.read(4096))
+
+                message = client_shake.get_message()
                 message = person.name + ': ' + message
-                message = pickle.dumps(message)
+
+                # if a new client connects update list from all clients.
+                message_pack = MessagePacket.MessagePacket(message, MessageType.ON_CONNECT.value, person.name)
                 for p in self.__clients:
                     # may need to add message types in client
-                    self.__clients[p].writer.write(message)
+                    self.__clients[p].writer.write(pickle.dumps(message_pack))
 
-            elif client_shake[0] == MessageType.WHISPER.value:
+            elif client_shake.get_message_type() == MessageType.WHISPER.value:
                 logging.debug("server has received type whisper")
-                message = await person.reader.read(4096)
+                message = pickle.loads(await person.reader.read(4096))
                 val = self.get_client(message)
                 if val == 0:
                     person.writer.write(pickle.dumps('error sending message'))
@@ -109,23 +109,22 @@ class Server(object):
         :param writer: writer for the client
         """
         logging.debug("add client to the dictionary")
+
         while True:
-            client_shake = await reader.readexactly(2)
-            logging.debug("client sent %s", client_shake)
-            if client_shake[0] != MessageType.ON_CONNECT.value:
+            message_pack = pickle.loads(await reader.read(4096))
+            logging.debug("client sent %s", message_pack.get_message_type())
+            if message_pack.get_message_type() != MessageType.ON_CONNECT.value:
                 logging.debug("Client sent something wrong, killing client")
                 self.kill_client(writer)
                 return
-            client_name = pickle.loads(await reader.read(4096))
-            # check if client name already used
-            if client_name in self.__clients.keys():
+            if message_pack.get_client_name() in self.__clients.keys():
                 logging.debug("asking for a different name")
-                writer.write(bytes([MessageType.RESEND_NAME.value, MessageType.RESEND_NAME.value]))
+                writer.write(pickle.dumps(MessagePacket.MessagePacket(None, MessageType.RESEND_NAME.value, None)))
             else:
-                writer.write(bytes([MessageType.OKAY_NAME.value, MessageType.OKAY_NAME.value]))
-                logging.debug("%s has connected", client_name)
-                new_client = Person(name=client_name, reader=reader, writer=writer)
-                self.__clients[client_name] = new_client
+                writer.write(pickle.dumps(MessagePacket.MessagePacket(None, MessageType.OKAY_NAME.value, None)))
+                logging.debug("%s has connected", message_pack.get_client_name())
+                new_client = Person(name=message_pack.get_client_name(), reader=reader, writer=writer)
+                self.__clients[message_pack.get_client_name()] = new_client
                 await self.converse(new_client)
 
     def start_server(self):

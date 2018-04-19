@@ -2,7 +2,7 @@ import socket
 import enum
 import logging
 import pickle
-import threading
+import MessagePacket
 
 
 class MessageType(enum.Enum):
@@ -42,24 +42,23 @@ class Client(object):
         send name to server on initial connection
         :return 1 if the name is longer than 2 characters and unique else return 0
         """
-        if len(name) < 2:
-            return
-        self.__sock.sendall(bytes([MessageType.ON_CONNECT.value, MessageType.ON_CONNECT.value]))
-        self.__sock.sendall(pickle.dumps(name))
-        chk = self.__sock.recv(2)
-        if chk[0] == MessageType.OKAY_NAME.value:
+        if name is None:
+            return 0
+        self.__sock.sendall(pickle.dumps(MessagePacket.MessagePacket(None, MessageType.ON_CONNECT.value, name)))
+        chk = pickle.loads(self.__sock.recv(4096))
+        if chk.get_message_type() == MessageType.OKAY_NAME.value:
             return 1
         else:
             return 0
 
-    def send_to_server(self, message, mess_type):
+    def send_to_server(self, message, mess_type, client_name):
         """
         send message to the server
         :param message: message being sent
         :param mess_type: type of message; whisper, shout, regular message
+        :param client_name: name of the client if the message is a whisper
         """
-        self.__sock.sendall(bytes([mess_type, mess_type]))
-        self.__sock.sendall(pickle.dumps(message))
+        self.__sock.sendall(pickle.dumps(MessagePacket.MessagePacket(message,mess_type, client_name)))
         return
 
     def receive_from_server(self):
@@ -68,4 +67,4 @@ class Client(object):
         :return: string of what was received
         """
         message = pickle.loads(self.__sock.recv(4096))
-        return str(message)
+        return str(message.get_message())

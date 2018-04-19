@@ -80,7 +80,7 @@ class ClientGui(tk.Tk):
         sends message to the other clients
         """
         self.client.send_to_server(self.s_box(),
-                                   Client.MessageType.MESSAGE.value)
+                                   Client.MessageType.MESSAGE.value, None)
 
 
 class Dialog(tk.Tk):
@@ -89,7 +89,7 @@ class Dialog(tk.Tk):
         """
         initializes the dialog box to take in user input to send initial data
         to server
-        :param message: message that needs to be displayed
+        :param label: message that needs to be displayed
         """
         tk.Tk.__init__(self, label)
         label_message = tk.Label(self, text=label)
@@ -99,7 +99,7 @@ class Dialog(tk.Tk):
         self.e.pack()
 
         self.e.focus_set()
-        self.message = ''
+        self.message = None
         self.button = tk.Button(text='OK', width=10, command=self.dialog_get)
         self.button.pack()
         self.mainloop()
@@ -108,7 +108,11 @@ class Dialog(tk.Tk):
         """
         Gets the message from the dialog box
         """
-        self.message = self.e.get()
+        name = self.e.get()
+        if len(name) == 0:
+            self.message = None
+        else:
+            self.message = name
         self.destroy()
 
 
