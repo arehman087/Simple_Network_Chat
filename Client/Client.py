@@ -16,23 +16,23 @@ class MessageType(enum.Enum):
     SHOUT = 4
     RESEND_NAME = 5
     OKAY_NAME = 6
+    REFRESH_CLIENTS = 7
 
 
 class Client(object):
     """
-    creates a client that will recieve messages
+    creates a client that will receive messages
     """
 
     def __init__(self, host, port):
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__host = host
         self.__port = port
+        self.__clients = []
 
     def make_connection(self):
         """
         makes the connection to the host.
-        :param host: IP address of the server it is connecting to
-        :param port: port of the host
         """
 
         self.__sock.connect((self.__host, self.__port))
@@ -67,4 +67,20 @@ class Client(object):
         :return: string of what was received
         """
         message = pickle.loads(self.__sock.recv(4096))
+        if message.get_message_type() == MessageType.REFRESH_CLIENTS.value:
+            self.refresh_clients(message)
+            print(self.__clients)
+            if message.get_client_name() is None:
+                return ''
+            return str(message.get_client_name()) + " has connected\n"
         return str(message.get_message())
+
+    def refresh_clients(self, message_pack):
+        """
+        update the client dictionary
+        :param message_pack: packet that holds the dictionary
+        """
+        self.__clients = message_pack.get_message()
+
+    def get_clients(self):
+        return self.__clients

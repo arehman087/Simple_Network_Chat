@@ -20,6 +20,7 @@ class MessageType(enum.Enum):
     SHOUT = 4
     RESEND_NAME = 5
     OKAY_NAME = 6
+    REFRESH_CLIENTS = 7
 
 
 class Server(object):
@@ -61,12 +62,11 @@ class Server(object):
         if message_pack.get_client_name is None:
             logging.debug('invalid format!')
             return 0
-
+        name = message_pack.get_client_name()
         try:
-            self.__clients[message_pack.get_client_name()].writer.write(pickle.dumps
-                                                                        (MessagePacket.MessagePacket
-                                                                         (message_pack.get_message(),
-                                                                          MessageType.MESSAGE.value, None)))
+            self.__clients[name].writer.write(pickle.dumps
+                                              (MessagePacket.MessagePacket
+                                               (message_pack.get_message(), MessageType.MESSAGE.value, None)))
         except KeyError:
             return 0
         return 1
@@ -125,6 +125,20 @@ class Server(object):
                 logging.debug("%s has connected", message_pack.get_client_name())
                 new_client = Person(name=message_pack.get_client_name(), reader=reader, writer=writer)
                 self.__clients[message_pack.get_client_name()] = new_client
+                for p in self.__clients:
+                    # may need to add message types in client
+                    client_list = list(self.__clients.keys())
+                    client_list.remove(p)
+                    if p == new_client.name:
+                        self.__clients[p].writer.write(pickle.dumps
+                                                       (MessagePacket.MessagePacket(client_list,
+                                                                                    MessageType.REFRESH_CLIENTS.value,
+                                                                                    None)))
+                    else:
+                        self.__clients[p].writer.write(pickle.dumps
+                                                       (MessagePacket.MessagePacket(client_list,
+                                                                                    MessageType.REFRESH_CLIENTS.value,
+                                                                                    new_client.name)))
                 await self.converse(new_client)
 
     def start_server(self):
